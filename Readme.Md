@@ -125,7 +125,7 @@ In a real Fintech system, idempotency keys should expire after 24 hours (matchin
 
 ## User Stories Implemented
 
-- ✅ User Story 1: First transaction processed with 2s delay, returns 201
-- ✅ User Story 2: Duplicate request returns cached response with X-Cache-Hit: true
-- ✅ User Story 3: Same key with different body returns 422
-- ✅ Bonus: Race condition handling — second request waits for first to complete
+-  User Story 1: First transaction processed with 2s delay, returns 201
+-  User Story 2: Duplicate request returns cached response with X-Cache-Hit: true
+-  User Story 3: Same key with different body returns 422
+-  Bonus: Race condition handling — second request waits for first to complete
