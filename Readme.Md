@@ -6,32 +6,7 @@ A RESTful API that ensures payments are processed **exactly once**, no matter ho
 
 ## Architecture Diagram
 ---
-CLIENT                  IDEMPOTENCY LAYER            JSON DATABASE
-|                            |                           |
-|-- POST /process-payment -->|                           |
-|   Idempotency-Key: abc-123 |                           |
-|                            |-- Lookup key ------------>|
-|                            |<-- Not found -------------|
-|                            |-- Save IN_FLIGHT -------->|
-|                            |                           |
-|                            |  [Process payment: 2s]    |
-|                            |                           |
-|                            |-- Save DONE + response -->|
-|<-- 201 "Charged 100 GHS" --|                           |
-|                            |                           |
-|-- POST /process-payment -->|  (duplicate request)      |
-|   Idempotency-Key: abc-123 |                           |
-|                            |-- Lookup key ------------>|
-|                            |<-- Found: DONE -----------|
-|<-- 201 (cached response) --|                           |
-|    X-Cache-Hit: true       |                           |
-|                            |                           |
-|-- POST /process-payment -->|  (different body)         |
-|   Idempotency-Key: abc-123 |                           |
-|   amount: 500              |-- Lookup key ------------>|
-|                            |<-- Found: hash mismatch --|
-|<-- 422 Conflict -----------|                           |
-
+                             
 ## Setup Instructions
 
 ### Prerequisites
