@@ -1,45 +1,107 @@
 const express = require('express');
+const { v4: uuidv4 } = require('uuid');
+const path = require('path');
 const db = require('./db');
 const idempotencyMiddleware = require('./middleware');
 
 const app = express();
+
 app.use(express.json());
 
-// Initialize database before starting
-db.read().then(() => {
+// Serve the HTML tester page
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Request logger
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const cached = res.getHeader('X-Cache-Hit') ? ' [CACHED]' : '';
+    console.log(`${req.method} ${req.path} → ${res.statusCode}${cached} (${duration}ms)`);
+  });
+  next();
+});
+
+app.use(idempotencyMiddleware);
+
+app.post('/process-payment', async (req, res) => {
+  const { amount, currency } = req.body;
+
+  if (amount === undefined || amount === null) {
+    return res.status(400).json({ error: 'amount is required.', code: 'MISSING_AMOUNT' });
+  }
+  if (!currency) {
+    return res.status(400).json({ error: 'currency is required.', code: 'MISSING_CURRENCY' });
+  }
+  if (typeof amount !== 'number' || amount <= 0) {
+    return res.status(400).json({ error: 'amount must be a positive number.', code: 'INVALID_AMOUNT' });
+  }
+  if (typeof currency !== 'string' || currency.length !== 3) {
+    return res.status(400).json({ error: 'currency must be a valid 3-letter code e.g. GHS, USD.', code: 'INVALID_CURRENCY' });
+  }
+
+  console.log(`[PAYMENT] Processing ${amount} ${currency.toUpperCase()}...`);
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  const transactionId = `txn_${uuidv4()}`;
+  console.log(`[PAYMENT] Success — ${transactionId}`);
+
+  return res.status(201).json({
+    status: 'success',
+    message: `Charged ${amount} ${currency.toUpperCase()}`,
+    transactionId,
+    amount,
+    currency: currency.toUpperCase(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/health', (_, res) => {
+  res.json({
+    status: 'ok',
+    uptime: `${Math.floor(process.uptime())}s`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/keys/:key', async (req, res) => {
+  await db.read();
+  const record = db.data.keys[req.params.key];
+  if (!record) {
+    return res.status(404).json({ error: 'Key not found.' });
+  }
+  res.json({
+    key: req.params.key,
+    status: record.status,
+    requested_at: record.requested_at,
+    completed_at: record.completed_at,
+    status_code: record.status_code,
+  });
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
+});
+
+app.use((err, req, res, next) => {
+  console.error('[ERROR]', err);
+  res.status(500).json({ error: 'An unexpected error occurred.' });
+});
+
+async function start() {
+  await db.read();
   db.data ||= { keys: {} };
-  return db.write();
-}).then(() => {
-
-  app.use(idempotencyMiddleware);
-
-  app.post('/process-payment', async (req, res) => {
-    const { amount, currency } = req.body;
-
-    if (!amount || !currency) {
-      return res.status(400).json({
-        error: 'amount and currency are required.',
-      });
-    }
-
-    // Simulate 2 second processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    return res.status(201).json({
-      status: 'success',
-      message: `Charged ${amount} ${currency}`,
-      transactionId: `txn_${Date.now()}`,
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  app.get('/health', (_, res) => {
-    res.json({ status: 'ok' });
-  });
+  await db.write();
 
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`IgirePay Idempotency Gateway running on port ${PORT}`);
+    console.log('');
+    console.log('  IgirePay Idempotency Gateway');
+    console.log(`  Running on http://localhost:${PORT}`);
+    console.log('');
+    console.log('  Open http://localhost:3000 in your browser to use the tester');
+    console.log('');
   });
+}
 
-});
+start();
