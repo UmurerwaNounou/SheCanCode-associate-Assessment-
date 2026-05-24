@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IgirePay — API Tester</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #58a6ff;
+    }
+
+    header p {
+      color: #8b949e;
+      margin-top: 6px;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 700px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #e6edf3;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .method {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #1f6feb;
+      color: #fff;
+    }
+
+    .method.get { background: #238636; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 4px;
+      margin-top: 12px;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px 12px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      font-size: 14px;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-blue { background: #1f6feb; color: #fff; }
+    .btn-red  { background: #da3633; color: #fff; }
+    .btn-green{ background: #238636; color: #fff; }
+
+    .response-box {
+      grid-column: 1 / -1;
+    }
+
+    .response-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    .badge.success { background: #1a4731; color: #3fb950; }
+    .badge.cached  { background: #1c3a6b; color: #58a6ff; }
+    .badge.error   { background: #4b1113; color: #f85149; }
+    .badge.waiting { background: #2d2208; color: #d29922; }
+
+    pre {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 13px;
+      color: #e6edf3;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      min-height: 80px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .log {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      font-family: monospace;
+      max-height: 160px;
+      overflow-y: auto;
+      color: #8b949e;
+    }
+
+    .log-entry { margin-bottom: 4px; }
+    .log-entry.ok   { color: #3fb950; }
+    .log-entry.hit  { color: #58a6ff; }
+    .log-entry.err  { color: #f85149; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #30363d;
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>IgirePay Idempotency Gateway</h1>
+  <p>Test the Pay-Once Protocol — send duplicate requests and watch the magic happen</p>
+</header>
+
+<div class="grid">
+
+  <!-- Process Payment -->
+  <div class="card">
+    <h2><span class="method">POST</span> /process-payment</h2>
+
+    <label>Idempotency Key</label>
+    <input id="ikey" type="text" value="pay-key-00000001" />
+
+    <label>Amount</label>
+    <input id="amount" type="number" value="100" />
+
+    <label>Currency (3 letters)</label>
+    <input id="currency" type="text" value="GHS" maxlength="3" />
+
+    <button class="btn-blue" onclick="sendPayment()" id="payBtn">
+      Send Payment Request
+    </button>
+
+    <button class="btn-red" onclick="sendConflict()" style="margin-top:8px">
+      Send Conflict (same key, different amount)
+    </button>
+  </div>
+
+  <!-- Utility endpoints -->
+  <div class="card">
+    <h2><span class="method get">GET</span> Utility Endpoints</h2>
+
+    <label>Health Check</label>
+    <button class="btn-green" onclick="checkHealth()">GET /health</button>
+
+    <label style="margin-top:16px">Look Up Idempotency Key</label>
+    <input id="lookupKey" type="text" placeholder="Enter a key to look up..." value="pay-key-00000001"/>
+    <button class="btn-green" onclick="lookupKey()" style="margin-top:8px">GET /keys/:key</button>
+
+    <label style="margin-top:16px">Activity Log</label>
+    <div class="log" id="log">
+      <div class="log-entry">Waiting for requests...</div>
+    </div>
+  </div>
+
+  <!-- Response -->
+  <div class="card response-box">
+    <div class="response-header">
+      <h2 style="margin:0">Response</h2>
+      <span class="badge" id="badge" style="display:none"></span>
+    </div>
+    <pre id="output">Click a button above to test the API...</pre>
+  </div>
+
+</div>
+
+<script>
+  function addLog(msg, type = '') {
+    const log = document.getElementById('log');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function showResult(data, status, cached) {
+    const badge = document.getElementById('badge');
+    badge.style.display = 'inline-block';
+
+    if (cached) {
+      badge.className = 'badge cached';
+      badge.textContent = '✓ CACHED — X-Cache-Hit: true';
+    } else if (status >= 400) {
+      badge.className = 'badge error';
+      badge.textContent = `✗ ERROR ${status}`;
+    } else {
+      badge.className = 'badge success';
+      badge.textContent = `✓ SUCCESS ${status}`;
+    }
+
+    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (loading) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Processing...';
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = 'Send Payment Request';
+    }
+  }
+
+  async function sendPayment() {
+    const key = document.getElementById('ikey').value;
+    const amount = parseFloat(document.getElementById('amount').value);
+    const currency = document.getElementById('currency').value;
+
+    setLoading('payBtn', true);
+    addLog(`POST /process-payment — Key: ${key}`, '');
+    document.getElementById('output').textContent = 'Processing... (new requests take 2 seconds)';
+
+    try {
+      const res = await fetch('/process-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': key
+        },
+        body: JSON.stringify({ amount, currency })
+      });
+
+      const cached = res.headers.get('X-Cache-Hit');
+      const data = await res.json();
+
+      if (cached) {
+        addLog(`Cache hit — returned stored response instantly`, 'hit');
+      } else if (res.status >= 400) {
+        addLog(`Error ${res.status} — ${data.error}`, 'err');
+      } else {
+        addLog(`Success ${res.status} — ${data.transactionId}`, 'ok');
+      }
+
+      showResult(data, res.status, cached);
+    } catch (e) {
+      addLog(`Network error — is the server running?`, 'err');
+      document.getElementById('output').textContent = 'Error: Could not connect to server.';
+    }
+
+    setLoading('payBtn', false);
+  }
+
+  async function sendConflict() {
+    const key = document.getElementById('ikey').value;
+    addLog(`POST /process-payment — Conflict test with key: ${key}`, '');
+    document.getElementById('output').textContent = 'Sending conflict request...';
+
+    try {
+      const res = await fetch('/process-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': key
+        },
+        body: JSON.stringify({ amount: 99999, currency: 'USD' })
+      });
+
+      const data = await res.json();
+      addLog(`Conflict response ${res.status} — ${data.error}`, 'err');
+      showResult(data, res.status, null);
+    } catch (e) {
+      addLog('Network error', 'err');
+    }
+  }
+
+  async function checkHealth() {
+    addLog('GET /health', '');
+    try {
+      const res = await fetch('/health');
+      const data = await res.json();
+      addLog(`Health OK — uptime: ${data.uptime}`, 'ok');
+      showResult(data, res.status, null);
+    } catch (e) {
+      addLog('Network error', 'err');
+    }
+  }
+
+  async function lookupKey() {
+    const key = document.getElementById('lookupKey').value;
+    addLog(`GET /keys/${key}`, '');
+    try {
+      const res = await fetch(`/keys/${key}`);
+      const data = await res.json();
+      addLog(`Key status: ${data.status || 'not found'}`, res.ok ? 'ok' : 'err');
+      showResult(data, res.status, null);
+    } catch (e) {
+      addLog('Network error', 'err');
+    }
+  }
+</script>
+</body>
+</html>
