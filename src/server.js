@@ -78,7 +78,24 @@ app.get('/keys/:key', async (req, res) => {
     status_code: record.status_code,
   });
 });
+/**
+ * GET /stats
+ * Returns a summary of all idempotency keys in the system.
+ * Great for monitoring dashboards.
+ */
+app.get('/stats', async (req, res) => {
+  await db.read();
+  const keys = Object.values(db.data.keys);
 
+  const stats = {
+    total: keys.length,
+    done: keys.filter(k => k.status === 'DONE').length,
+    in_flight: keys.filter(k => k.status === 'IN_FLIGHT').length,
+    timestamp: new Date().toISOString(),
+  };
+
+  res.json(stats);
+});
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
 });
@@ -103,5 +120,27 @@ async function start() {
     console.log('');
   });
 }
+// Auto-cleanup: delete keys older than 24 hours every hour
+// In production Fintech systems, idempotency keys expire after 24 hours
+// This prevents the database from growing forever
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
+setInterval(async () => {
+  await db.read();
+  const now = Date.now();
+  let cleaned = 0;
+
+  for (const [key, record] of Object.entries(db.data.keys)) {
+    const age = now - new Date(record.requested_at).getTime();
+    if (age > TWENTY_FOUR_HOURS) {
+      delete db.data.keys[key];
+      cleaned++;
+    }
+  }
+
+  if (cleaned > 0) {
+    await db.write();
+    console.log(`[CLEANUP] Removed ${cleaned} expired idempotency key(s).`);
+  }
+}, 60 * 60 * 1000); // runs every hour
 start();
