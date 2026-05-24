@@ -218,7 +218,8 @@
 
     <label>Health Check</label>
     <button class="btn-green" onclick="checkHealth()">GET /health</button>
-
+<label style="margin-top:16px">System Stats</label>
+<button class="btn-green" onclick="checkStats()">GET /stats</button>
     <label style="margin-top:16px">Look Up Idempotency Key</label>
     <input id="lookupKey" type="text" placeholder="Enter a key to look up..." value="pay-key-00000001"/>
     <button class="btn-green" onclick="lookupKey()" style="margin-top:8px">GET /keys/:key</button>
@@ -352,6 +353,17 @@
       addLog('Network error', 'err');
     }
   }
+  async function checkStats() {
+  addLog('GET /stats', '');
+  try {
+    const res = await fetch('/stats');
+    const data = await res.json();
+    addLog(`Stats — total: ${data.total}, done: ${data.done}, in_flight: ${data.in_flight}`, 'ok');
+    showResult(data, res.status, null);
+  } catch (e) {
+    addLog('Network error', 'err');
+  }
+}
 
   async function lookupKey() {
     const key = document.getElementById('lookupKey').value;
